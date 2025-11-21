@@ -222,7 +222,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     isActive={isActive}
                     tooltip={item.title}
                   >
-                    <Link href={item.url} className="font-medium">
+                    <Link href={item.url}>
                       <Icon className="size-4" />
                       <span>{item.title}</span>
                     </Link>

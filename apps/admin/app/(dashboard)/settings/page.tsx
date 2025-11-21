@@ -19,8 +19,17 @@ import {
   SelectValue,
 } from "@repo/ui/components/ui/select";
 import { Settings, Save, User, Bell, Shield, Palette } from "lucide-react";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 export default function SettingsPage() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  // Hindari hydration mismatch dengan menunggu component mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   return (
     <div className="space-y-6">
       <div>
@@ -201,16 +210,24 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="grid gap-2">
               <Label htmlFor="theme">Theme</Label>
-              <Select defaultValue="light">
-                <SelectTrigger id="theme">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="light">Light</SelectItem>
-                  <SelectItem value="dark">Dark</SelectItem>
-                  <SelectItem value="system">System</SelectItem>
-                </SelectContent>
-              </Select>
+              {!mounted ? (
+                <Select disabled>
+                  <SelectTrigger id="theme">
+                    <SelectValue placeholder="Loading..." />
+                  </SelectTrigger>
+                </Select>
+              ) : (
+                <Select value={theme} onValueChange={setTheme}>
+                  <SelectTrigger id="theme">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="light">Light</SelectItem>
+                    <SelectItem value="dark">Dark</SelectItem>
+                    <SelectItem value="system">System</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="language">Language</Label>

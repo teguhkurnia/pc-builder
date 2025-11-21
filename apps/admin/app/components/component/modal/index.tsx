@@ -87,17 +87,28 @@ export default function ComponentModal({
   });
 
   useEffect(() => {
-    if (defaultValues) {
-      reset({
-        name: defaultValues.name,
-        type: defaultValues.type,
-        price: defaultValues.price,
-        imageUrl: defaultValues.imageUrl,
-        specifications: defaultValues.specifications,
-      });
-      setSelectedImage(defaultValues.imageUrl || undefined);
+    if (open) {
+      if (defaultValues) {
+        reset({
+          name: defaultValues.name,
+          type: defaultValues.type,
+          price: defaultValues.price,
+          imageUrl: defaultValues.imageUrl,
+          specifications: defaultValues.specifications,
+        });
+        setSelectedImage(defaultValues.imageUrl || undefined);
+      } else {
+        reset({
+          name: "",
+          type: componentTypes[0] as CreateComponentSchema["type"],
+          price: 0,
+          imageUrl: null,
+          specifications: {},
+        });
+        setSelectedImage(undefined);
+      }
     }
-  }, [defaultValues, reset]);
+  }, [defaultValues, reset, open]);
 
   useEffect(() => {
     reset({
@@ -125,7 +136,7 @@ export default function ComponentModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>
             {mode === "create" ? "Add New Component" : "Edit Component"}
@@ -136,7 +147,11 @@ export default function ComponentModal({
               : "Update the component details below."}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(handleFormSubmit)}>
+        <form
+          onSubmit={handleSubmit(handleFormSubmit)}
+          className="max-h-[70vh] overflow-y-auto"
+          id="component-form"
+        >
           <div className="grid lg:grid-cols-2 gap-6">
             <div className="grid gap-4 py-4 h-fit">
               {/* Name Field */}
@@ -220,7 +235,7 @@ export default function ComponentModal({
                 <Label htmlFor="image">Product Image</Label>
                 <div className="flex gap-2">
                   {selectedImage ? (
-                    <div className="relative w-full aspect-video rounded-lg border overflow-hidden group">
+                    <div className="relative w-full aspect-square rounded-lg border overflow-hidden group">
                       <Image
                         src={selectedImage}
                         alt="Selected product"
@@ -272,8 +287,8 @@ export default function ComponentModal({
               </div>
             </div>
 
-            <ScrollArea className="max-h-96">
-              <div className="grid px-2">
+            <ScrollArea className="h-full">
+              <div className="grid lg:px-2 pb-8">
                 {/* Specifications */}
                 {selectedType && specificationFields && (
                   <div className="grid gap-4">
@@ -362,27 +377,27 @@ export default function ComponentModal({
               </div>
             </ScrollArea>
           </div>
-          <DialogFooter className="mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLoading
-                ? mode === "create"
-                  ? "Creating..."
-                  : "Updating..."
-                : mode === "create"
-                  ? "Add Component"
-                  : "Update Component"}
-            </Button>
-          </DialogFooter>
         </form>
+        <DialogFooter className="mt-4 gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isLoading}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isLoading
+              ? mode === "create"
+                ? "Creating..."
+                : "Updating..."
+              : mode === "create"
+                ? "Add Component"
+                : "Update Component"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
 
       <ImageGalleryPicker

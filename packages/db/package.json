@@ -13,7 +13,8 @@
   },
   "scripts": {
     "init": "prisma init",
-    "generate": "prisma generate"
+    "generate": "prisma generate",
+    "migrate:dev": "prisma migrate dev"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.0.0",
