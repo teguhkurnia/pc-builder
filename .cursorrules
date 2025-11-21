@@ -1,0 +1,624 @@
+# PC Builder Platform - AI Assistant Rules
+
+Anda adalah AI assistant yang ahli dalam membangun aplikasi PC Builder menggunakan TypeScript, React, Next.js, tRPC, dan Prisma. Ikuti aturan berikut dengan ketat.
+
+## 🎯 Prinsip Utama
+
+1. **Bahasa**: Gunakan Bahasa Indonesia untuk komunikasi dan komentar, gunakan English untuk penamaan code
+2. **Type Safety First**: Selalu gunakan TypeScript dengan strict mode, hindari `any`
+3. **Consistency**: Ikuti pattern yang sudah ada di codebase
+4. **Simplicity**: Tulis code yang simple dan mudah dibaca, hindari over-engineering
+
+## 📁 Struktur Project (Turborepo Monorepo)
+
+```
+pc-builder/
+├── apps/
+│   ├── admin/          # Next.js - Admin Dashboard
+│   ├── builder/        # Next.js - PC Builder App
+│   └── server/         # Fastify - Standalone API Server
+├── packages/
+│   ├── api/           # tRPC routers & services
+│   ├── db/            # Prisma client & schema
+│   ├── ui/            # Shared React components (shadcn/ui)
+│   ├── eslint-config/ # ESLint configurations
+│   └── typescript-config/ # TypeScript configurations
+```
+
+## 🔧 Tech Stack
+
+- **Framework**: Next.js 15+ (App Router)
+- **Language**: TypeScript 5.9.2
+- **API**: tRPC
+- **Database**: Prisma + MySQL
+- **UI**: Tailwind CSS + shadcn/ui
+- **Package Manager**: pnpm
+- **Monorepo**: Turborepo
+
+## 📝 Coding Standards
+
+### TypeScript
+
+```typescript
+// ✅ GOOD: Explicit types dengan interface
+interface Props {
+  component: Component;
+  onEdit?: (id: number) => void;
+  onDelete?: (id: number) => void;
+}
+
+export default function ComponentCard({ 
+  component, 
+  onEdit, 
+  onDelete 
+}: Props) {
+  // ...
+}
+
+// ❌ BAD: Implicit any atau tanpa type
+export default function ComponentCard({ component, onEdit, onDelete }) {
+  // ...
+}
+```
+
+### React Components
+
+1. **Gunakan Function Components** (bukan Class Components)
+2. **Export default untuk components**, export named untuk utilities
+3. **Props interface diatas component**
+4. **Use client directive** jika butuh client-side features
+
+```typescript
+"use client";
+
+import { useState } from "react";
+import { Button } from "@repo/ui/components/ui/button";
+
+interface Props {
+  title: string;
+  onSubmit?: () => void;
+}
+
+export default function MyComponent({ title, onSubmit }: Props) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  return (
+    <div>
+      <h1>{title}</h1>
+      <Button onClick={onSubmit}>Submit</Button>
+    </div>
+  );
+}
+```
+
+### File Naming
+
+- **Components**: `kebab-case.tsx` → `component-card.tsx`
+- **Utilities/Hooks**: `camelCase.ts` → `useComponent.tsx`
+- **Types/Interfaces**: `PascalCase` → `ComponentCardProps`
+- **Router files**: `*.router.ts` → `app.router.ts`
+- **Service files**: `*.service.ts` → `create.service.ts`
+
+### Import Order
+
+```typescript
+// 1. External packages
+import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+// 2. Internal packages (@repo/*)
+import { Button } from "@repo/ui/components/ui/button";
+import { createComponentSchema } from "@repo/api/models";
+
+// 3. Relative imports
+import { useComponent } from "../../hooks/useComponent";
+import ComponentCard from "../component/grid-card";
+```
+
+### tRPC Pattern
+
+**Router Structure** (`packages/api/src/routers/*.router.ts`):
+
+```typescript
+import { z } from "zod";
+import { createTRPCRouter, publicProcedure } from "../trpc";
+import { createComponent } from "../services/components/create.service";
+import { listComponents } from "../services/components/list.service";
+
+export const componentsRouter = createTRPCRouter({
+  list: publicProcedure
+    .input(listComponentsRequestSchema)
+    .query(async ({ input }) => {
+      return await listComponents(input);
+    }),
+
+  create: publicProcedure
+    .input(createComponentSchema)
+    .mutation(async ({ input }) => {
+      return await createComponent(input);
+    }),
+});
+```
+
+**Service Structure** (`packages/api/src/services/**/*.service.ts`):
+
+```typescript
+import { db } from "@repo/db";
+import type { CreateComponentSchema } from "../models";
+
+export async function createComponent(input: CreateComponentSchema) {
+  const component = await db.component.create({
+    data: {
+      name: input.name,
+      type: input.type,
+      price: input.price,
+      specifications: input.specifications,
+      imageUrl: input.imageUrl,
+    },
+  });
+  
+  return component;
+}
+```
+
+**Client Usage via Custom Hooks** (`apps/*/app/hooks/api/*.ts`):
+
+```typescript
+// hooks/api/useComponent.ts
+import { api } from "../../utils/api";
+
+export const useListComponents = () => {
+  const query = api.components.list.useQuery(undefined, {
+    // Default config agar UI component bersih
+    staleTime: 1000 * 60 * 5, // Cache 5 menit
+    refetchOnWindowFocus: false,
+  });
+
+  // Modifikasi return value agar lebih enak dipakai UI
+  return {
+    components: query.data ?? [], // Default empty array
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    refetch: query.refetch,
+  };
+};
+
+export const useCreateComponent = () => {
+  const utils = api.useContext();
+  
+  return api.components.create.useMutation({
+    onSuccess: () => {
+      // Invalidate queries
+      utils.components.list.invalidate();
+    },
+  });
+};
+```
+
+**Usage di Component**:
+
+```typescript
+"use client";
+
+import { useListComponents, useCreateComponent } from "@/hooks/api/useComponent";
+
+export default function ComponentsPage() {
+  const { components, isLoading } = useListComponents();
+  const createMutation = useCreateComponent();
+
+  return (
+    // ...
+  );
+}
+```
+
+**Keuntungan Pattern ini**:
+- ✅ Separation of concerns (data fetching logic terpisah dari UI)
+- ✅ Reusable hooks untuk multiple components
+- ✅ Centralized configuration (staleTime, refetch, etc)
+- ✅ Easier testing (mock hooks instead of tRPC)
+- ✅ Cleaner component code
+
+### Zod Schema Pattern
+
+**Model Structure** (`packages/api/src/models/*.ts`):
+
+```typescript
+// packages/api/src/models/component.ts
+import { ComponentSchema } from "@repo/db/schemas";
+import z from "zod";
+
+// 1. List/Query Request Schema
+export const listComponentsRequestSchema = z
+  .object({
+    search: z.string().optional(),
+    type: z.string().optional(),
+    sortBy: z.enum(["name", "price", "date"]).optional(),
+    sortOrder: z.enum(["asc", "desc"]).optional(),
+  })
+  .optional();
+
+export type ListComponentsRequestSchema = z.infer<
+  typeof listComponentsRequestSchema
+>;
+
+// 2. List/Query Response Schema
+export const listComponentsSchema = z.array(
+  ComponentSchema.extend({
+    specifications: z.record(z.string(), z.any()),
+  }),
+);
+export type ListComponentsSchema = z.infer<typeof listComponentsSchema>;
+
+// 3. Create Schema (omit auto-generated fields)
+export const createComponentSchema = ComponentSchema.omit({
+  createdAt: true,
+  updatedAt: true,
+  id: true,
+});
+export type CreateComponentSchema = z.infer<typeof createComponentSchema>;
+
+// 4. Update Schema (semua field optional)
+export const updateComponentSchema = createComponentSchema.partial();
+export type UpdateComponentSchema = z.infer<typeof updateComponentSchema>;
+```
+
+**Pattern untuk CRUD Models**:
+- ✅ Import base schema dari `@repo/db/schemas` (auto-generated dari Prisma)
+- ✅ Buat separate schema untuk List Request (query parameters)
+- ✅ Buat separate schema untuk List Response (array of entities)
+- ✅ Create schema: omit auto-generated fields (id, timestamps)
+- ✅ Update schema: gunakan `.partial()` untuk optional fields
+- ✅ Export both schema dan inferred types
+- ✅ Tambahkan validation messages yang descriptive
+
+**Export Models** (`packages/api/src/models/index.ts`):
+
+```typescript
+// Centralized export untuk semua models
+export * from "./component";
+export * from "./build";
+// ... other models
+```
+
+**Usage**:
+
+```typescript
+// Di router atau service
+import { 
+  createComponentSchema, 
+  listComponentsRequestSchema,
+  type CreateComponentSchema,
+  type ListComponentsSchema 
+} from "../models";
+```
+
+**Validation Messages Best Practice**:
+
+```typescript
+// ✅ GOOD: Descriptive error messages
+export const createComponentSchema = z.object({
+  name: z.string().min(1, "Component name is required"),
+  type: z.enum(["CPU", "GPU", "RAM"], {
+    errorMap: () => ({ message: "Please select a valid component type" }),
+  }),
+  price: z.number().positive("Price must be greater than 0"),
+  stock: z.number().int("Stock must be a whole number").min(0, "Stock cannot be negative"),
+});
+
+// ❌ BAD: No error messages
+export const createComponentSchema = z.object({
+  name: z.string().min(1),
+  type: z.enum(["CPU", "GPU", "RAM"]),
+  price: z.number().positive(),
+});
+```
+
+### Prisma Patterns
+
+```typescript
+// ✅ GOOD: Include relations yang diperlukan
+const component = await db.component.findUnique({
+  where: { id },
+  select: {
+    id: true,
+    name: true,
+    price: true,
+    type: true,
+    // Include only what you need
+  },
+});
+
+// ✅ GOOD: Pagination
+const components = await db.component.findMany({
+  skip: (page - 1) * limit,
+  take: limit,
+  where: whereClause,
+  orderBy: { createdAt: "desc" },
+});
+
+// ❌ BAD: Fetch semua tanpa pagination
+const components = await db.component.findMany();
+```
+
+### Error Handling
+
+```typescript
+import { TRPCError } from "@trpc/server";
+
+export async function getComponent(id: number) {
+  const component = await db.component.findUnique({
+    where: { id },
+  });
+
+  if (!component) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: `Component with id ${id} not found`,
+    });
+  }
+
+  return component;
+}
+```
+
+### UI Components (shadcn/ui)
+
+```typescript
+import { Button } from "@repo/ui/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/ui/card";
+import { Dialog, DialogContent, DialogHeader } from "@repo/ui/components/ui/dialog";
+
+// Gunakan component dari @repo/ui, jangan create dari scratch
+```
+
+### Form Handling (React Hook Form + Zod)
+
+```typescript
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+const formSchema = z.object({
+  name: z.string().min(1),
+  price: z.number().positive(),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+export default function MyForm() {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      price: 0,
+    },
+  });
+
+  const onSubmit = async (data: FormValues) => {
+    // Handle submit
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register("name")} />
+      {errors.name && <p>{errors.name.message}</p>}
+    </form>
+  );
+}
+```
+
+### Custom Hooks
+
+```typescript
+// hooks/useComponent.tsx
+import { ListComponentsSchema } from "@repo/api/models";
+
+export const useComponent = () => {
+  const componentTypeColors: Record<string, string> = {
+    CPU: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+    GPU: "bg-red-500/10 text-red-500 border-red-500/20",
+    // ...
+  };
+
+  const getKeySpecs = (component: ListComponentsSchema[number]) => {
+    const specs = component.specifications as Record<string, any>;
+    const keys = Object.keys(specs).slice(0, 3);
+    return keys.map((key) => ({
+      label: key,
+      value: specs[key],
+    }));
+  };
+
+  return {
+    componentTypeColors,
+    getKeySpecs,
+  };
+};
+```
+
+## 🎨 Styling Guidelines
+
+1. **Tailwind CSS**: Gunakan utility classes
+2. **Dark mode support**: Gunakan `dark:` prefix
+3. **Responsive**: Mobile-first (`sm:`, `md:`, `lg:`)
+4. **Spacing**: Consistent spacing dengan Tailwind scale
+
+```typescript
+// ✅ GOOD
+<div className="flex items-center gap-2 p-4 rounded-lg bg-muted hover:bg-muted/80 transition-colors dark:bg-slate-800">
+  <span className="text-sm text-muted-foreground">Hello</span>
+</div>
+
+// ❌ BAD: Inline styles
+<div style={{ display: 'flex', padding: '16px' }}>
+  <span style={{ fontSize: '14px' }}>Hello</span>
+</div>
+```
+
+## 🚫 Yang HARUS Dihindari
+
+1. ❌ Jangan gunakan `any` type
+2. ❌ Jangan hardcode values, gunakan constants/config
+3. ❌ Jangan fetch data di component tanpa tRPC
+4. ❌ Jangan buat component UI dari scratch, pakai shadcn/ui
+5. ❌ Jangan commit file `.env`, gunakan `.env.example`
+6. ❌ Jangan bypass TypeScript errors dengan `//@ts-ignore`
+7. ❌ Jangan import dari package lain tanpa workspace protocol
+
+## ✅ Best Practices
+
+1. ✅ Gunakan `trpc` untuk semua API calls
+2. ✅ Gunakan `Prisma` untuk database operations
+3. ✅ Buat service layer untuk business logic
+4. ✅ Validation dengan Zod di frontend dan backend
+5. ✅ Handle loading & error states
+6. ✅ Gunakan React Query (via tRPC) untuk caching
+7. ✅ Optimize images dengan Next.js Image component
+8. ✅ Lazy load components kalau perlu
+
+## 📦 Package Usage
+
+### Workspace Dependencies
+
+```json
+{
+  "dependencies": {
+    "@repo/api": "workspace:*",
+    "@repo/db": "workspace:*",
+    "@repo/ui": "workspace:*"
+  }
+}
+```
+
+### Common Imports
+
+```typescript
+// tRPC
+import { trpc } from "@/lib/trpc";
+import { createTRPCRouter, publicProcedure } from "@repo/api/trpc";
+
+// Database
+import { db } from "@repo/db";
+
+// UI Components
+import { Button } from "@repo/ui/components/ui/button";
+
+// Icons (lucide-react)
+import { Loader2, Edit, Trash2, Plus } from "lucide-react";
+```
+
+## 🐛 Debugging
+
+```typescript
+// Development only logging
+if (process.env.NODE_ENV === "development") {
+  console.log("Debug:", data);
+}
+
+// Server logging (Fastify)
+server.log.info("Server started");
+server.log.error("Error:", error);
+```
+
+## 📄 Komentar Code
+
+```typescript
+// ✅ GOOD: Komentar yang menjelaskan "mengapa"
+// Gunakan setTimeout untuk menghindari race condition dengan React 18 concurrent rendering
+setTimeout(() => setIsOpen(false), 0);
+
+// ❌ BAD: Komentar yang menjelaskan "apa" (sudah jelas dari code)
+// Set isOpen to false
+setIsOpen(false);
+```
+
+## 🔒 Environment Variables
+
+```typescript
+// apps/server/.env
+DATABASE_URL="mysql://..."
+PORT=4000
+
+// Access via process.env
+const port = process.env.PORT || 4000;
+```
+
+## 🧪 Testing Mindset
+
+Meskipun belum ada testing setup, tulis code yang:
+- Pure functions (easy to test)
+- Single responsibility
+- Minimal side effects
+- Clear input/output
+
+## 🎯 Saat Generate Code
+
+1. **Pahami konteks**: Tanyakan jika tidak jelas
+2. **Follow existing patterns**: Lihat code yang sudah ada
+3. **Type everything**: Jangan skip TypeScript types
+4. **Handle edge cases**: Loading, error, empty states
+5. **Mobile responsive**: Selalu pertimbangkan mobile view
+6. **Accessibility**: Gunakan semantic HTML & ARIA when needed
+7. **Performance**: Lazy load, memoize jika perlu
+
+## 📚 File Structure untuk New Features
+
+```
+apps/admin/app/
+├── (dashboard)/
+│   └── components/
+│       ├── page.tsx              # Main page
+│       └── component/
+│           ├── grid-card.tsx     # Display component
+│           ├── list-card.tsx     # Alternative view
+│           └── modal/
+│               └── index.tsx     # Form modal
+├── hooks/
+│   ├── api/
+│   │   └── useComponent.ts       # tRPC hooks wrapper
+│   └── useComponent.tsx          # UI utility hook
+├── utils/
+│   └── api.ts                    # tRPC client instance
+└── lib/
+    └── trpc.ts                   # tRPC client setup
+
+packages/api/src/
+├── routers/
+│   └── app.router.ts             # Main tRPC router (combines all routers)
+├── services/
+│   └── components/
+│       ├── create.service.ts     # Business logic
+│       ├── list.service.ts
+│       ├── update.service.ts
+│       └── delete.service.ts
+└── models/
+    └── component.ts              # Zod schemas (CRUD models)
+        ├── listComponentsRequestSchema
+        ├── listComponentsSchema
+        ├── createComponentSchema
+        └── updateComponentSchema
+```
+
+## 🌟 Quality Checklist
+
+Sebelum consider code "done", pastikan:
+- [ ] TypeScript: No errors, no `any` types
+- [ ] Responsive: Works on mobile, tablet, desktop
+- [ ] Error handling: Loading & error states handled
+- [ ] Validation: Zod schema di frontend & backend
+- [ ] Consistent: Follows existing patterns
+- [ ] Clean: No console.logs in production
+- [ ] Accessible: Proper labels, semantic HTML
+- [ ] Optimized: Images optimized, no unnecessary re-renders
+
+---
+
+**Remember**: Code yang baik adalah code yang mudah dibaca dan di-maintain oleh orang lain (termasuk diri sendiri 6 bulan kemudian). Keep it simple, keep it typed, keep it consistent! 🚀
