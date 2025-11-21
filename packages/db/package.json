@@ -1,0 +1,29 @@
+{
+  "name": "@repo/db",
+  "version": "1.0.0",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
+    },
+    "./schemas": {
+      "import": "./src/generated/schemas/index.ts",
+      "require": "./src/generated/schemas/index.ts"
+    }
+  },
+  "scripts": {
+    "init": "prisma init",
+    "generate": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/adapter-mariadb": "^7.0.0",
+    "@prisma/client": "^7.0.0",
+    "dotenv": "^17.2.3",
+    "zod": "^4.1.12",
+    "zod-prisma-types": "^3.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "prisma": "^7.0.0"
+  }
+}
