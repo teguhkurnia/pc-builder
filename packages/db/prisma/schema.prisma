@@ -39,6 +39,60 @@ model Component {
   specifications Json
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+
+  // Relations
+  buildCpu         Build[] @relation("BuildCPU")
+  buildMotherboard Build[] @relation("BuildMotherboard")
+  buildRam         Build[] @relation("BuildRAM")
+  buildStorage     Build[] @relation("BuildStorage")
+  buildGpu         Build[] @relation("BuildGPU")
+  buildPsu         Build[] @relation("BuildPSU")
+  buildCase        Build[] @relation("BuildCase")
+  buildCooling     Build[] @relation("BuildCooling")
+}
+
+enum BuildStatus {
+  DRAFT
+  COMPLETED
+  SAVED
+}
+
+model Build {
+  id         Int         @id @default(autoincrement())
+  name       String
+  status     BuildStatus @default(DRAFT)
+  totalPrice Float       @default(0)
+
+  // Component references
+  cpuId Int?
+  cpu   Component? @relation("BuildCPU", fields: [cpuId], references: [id])
+
+  motherboardId Int?
+  motherboard   Component? @relation("BuildMotherboard", fields: [motherboardId], references: [id])
+
+  ramId Int?
+  ram   Component? @relation("BuildRAM", fields: [ramId], references: [id])
+
+  storageId Int?
+  storage   Component? @relation("BuildStorage", fields: [storageId], references: [id])
+
+  gpuId Int?
+  gpu   Component? @relation("BuildGPU", fields: [gpuId], references: [id])
+
+  psuId Int?
+  psu   Component? @relation("BuildPSU", fields: [psuId], references: [id])
+
+  caseId Int?
+  case   Component? @relation("BuildCase", fields: [caseId], references: [id])
+
+  coolingId Int?
+  cooling   Component? @relation("BuildCooling", fields: [coolingId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 enum AssetType {
