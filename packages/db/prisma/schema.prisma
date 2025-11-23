@@ -35,6 +35,7 @@ model Component {
   type           ComponentType
   price          Float
   imageUrl       String?
+  manufacturer   String?
   /// @zod.custom.use(z.record(z.string(), z.any()))
   specifications Json
   createdAt      DateTime      @default(now())

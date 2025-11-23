@@ -295,6 +295,12 @@ importers:
 
   packages/scripts:
     dependencies:
+      '@repo/api':
+        specifier: workspace:*
+        version: link:../api
+      '@repo/db':
+        specifier: workspace:*
+        version: link:../db
       axios:
         specifier: ^1.13.2
         version: 1.13.2
@@ -304,6 +310,9 @@ importers:
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
+      zod:
+        specifier: ^4.1.12
+        version: 4.1.12
     devDependencies:
       '@types/node':
         specifier: ^22.15.3

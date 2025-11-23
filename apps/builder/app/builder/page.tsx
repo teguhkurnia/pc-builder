@@ -165,7 +165,7 @@ export default function BuilderPage() {
           : null;
         if (!motherboard) return null;
         const mbSpecs = motherboard.specifications as Record<string, any>;
-        return { memoryType: mbSpecs.memory_type };
+        return { memoryType: mbSpecs.memoryType };
       }
       case "cooling": {
         // Filter cooling by CPU socket
@@ -183,7 +183,7 @@ export default function BuilderPage() {
           : null;
         if (!motherboard) return null;
         const mbSpecs = motherboard.specifications as Record<string, any>;
-        return { formFactor: mbSpecs.form_factor };
+        return { formFactor: mbSpecs.formFactor };
       }
       default:
         return null;
@@ -203,7 +203,7 @@ export default function BuilderPage() {
       case "ram":
         return (
           specs.type === filter.memoryType ||
-          specs.memory_type === filter.memoryType
+          specs.memoryType === filter.memoryType
         );
       case "cooling":
         return (
@@ -212,7 +212,7 @@ export default function BuilderPage() {
         );
       case "case":
         return (
-          specs.form_factor === filter.formFactor ||
+          specs.formFactor === filter.formFactor ||
           specs.compatibility?.includes(filter.formFactor)
         );
       default:
@@ -583,9 +583,9 @@ export default function BuilderPage() {
                         compatibilityInfo = `Socket: ${specs.socket}`;
                       } else if (
                         currentStepConfig.key === "ram" &&
-                        (specs.type || specs.memory_type)
+                        (specs.type || specs.memoryType)
                       ) {
-                        compatibilityInfo = `Type: ${specs.type || specs.memory_type}`;
+                        compatibilityInfo = `Type: ${specs.type || specs.memoryType}`;
                       } else if (
                         currentStepConfig.key === "cooling" &&
                         specs.socket
@@ -593,9 +593,9 @@ export default function BuilderPage() {
                         compatibilityInfo = `Socket: ${specs.socket}`;
                       } else if (
                         currentStepConfig.key === "case" &&
-                        specs.form_factor
+                        specs.formFactor
                       ) {
-                        compatibilityInfo = `Form Factor: ${specs.form_factor}`;
+                        compatibilityInfo = `Form Factor: ${specs.formFactor}`;
                       }
 
                       const keySpecs = Object.entries(specs)
@@ -608,7 +608,7 @@ export default function BuilderPage() {
                             return false;
                           if (
                             currentStepConfig.key === "ram" &&
-                            (key === "type" || key === "memory_type")
+                            (key === "type" || key === "memoryType")
                           )
                             return false;
                           if (
@@ -618,7 +618,7 @@ export default function BuilderPage() {
                             return false;
                           if (
                             currentStepConfig.key === "case" &&
-                            key === "form_factor"
+                            key === "formFactor"
                           )
                             return false;
                           return true;
