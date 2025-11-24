@@ -6,7 +6,12 @@
   "scripts": {
     "scrape:cpu": "tsx src/scrape-cpu.ts",
     "scrape:mobo": "tsx src/scrape-motherboard.ts",
-    "scrape:gpu": "tsx src/scrape-gpu.ts"
+    "scrape:gpu": "tsx src/scrape-gpu.ts",
+    "scrape:ram": "tsx src/scrape-ram.ts",
+    "scrape:psu": "tsx src/scrape-psu.ts",
+    "scrape:storage": "tsx src/scrape-storage.ts",
+    "scrape:case": "tsx src/scrape-case.ts",
+    "scrape:cooler": "tsx src/scrape-cooler.ts"
   },
   "keywords": [],
   "author": "",

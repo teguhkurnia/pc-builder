@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@repo/ui/components/ui/card";
 import { Loader2, Package, Plus } from "lucide-react";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 // Hooks & Components
@@ -35,11 +35,19 @@ function ComponentsPageContent() {
   const params = useComponentParams();
   const { componentTypes, componentTypeIcons } = useComponent();
 
-  const { components, isLoading, isFetching } = useListComponents({
+  const {
+    components,
+    isLoading,
+    isFetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useListComponents({
     search: params.debouncedSearch || undefined,
     type: params.filterType !== "all" ? params.filterType : undefined,
     sortBy: params.sortBy,
     sortOrder: params.sortOrder,
+    limit: 20,
   });
 
   const { createComponent, isCreating } = useCreateComponent();
@@ -87,7 +95,27 @@ function ComponentsPageContent() {
   const openEdit = (comp: ListComponentsSchema[number]) =>
     setModalState({ open: true, type: "edit", component: comp });
 
-  // 3. Empty State Helper
+  // 3. Infinite Scroll Setup
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasNextPage || isFetchingNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 },
+    );
+
+    observer.observe(loadMoreRef.current);
+
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // 4. Empty State Helper
   const renderEmptyState = () => (
     <Card>
       <CardContent className="flex h-48 flex-col items-center justify-center gap-2">
@@ -147,6 +175,15 @@ function ComponentsPageContent() {
               />
             ))}
           </div>
+
+          {/* Infinite Scroll Trigger - Grid View */}
+          {hasNextPage && (
+            <div ref={loadMoreRef} className="flex justify-center py-8">
+              {isFetchingNextPage && (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              )}
+            </div>
+          )}
         </div>
       ) : (
         // LIST VIEW
@@ -164,6 +201,15 @@ function ComponentsPageContent() {
                 onDelete={() => handleDelete(comp.id, comp.name)}
               />
             ))}
+
+            {/* Infinite Scroll Trigger - List View */}
+            {hasNextPage && (
+              <div ref={loadMoreRef} className="flex justify-center py-4">
+                {isFetchingNextPage && (
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

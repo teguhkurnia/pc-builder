@@ -97,6 +97,7 @@ export default function ComponentModal({
           specifications: defaultValues.specifications,
         });
         setSelectedImage(defaultValues.imageUrl || undefined);
+        setSelectedType(defaultValues.type);
       } else {
         reset({
           name: "",

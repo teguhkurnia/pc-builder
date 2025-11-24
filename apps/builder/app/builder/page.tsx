@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useCreateBuild, useUpdateBuild } from "../hooks/api/useBuild";
 import { useListComponents } from "../hooks/api/useComponent";
+import { useDebounce } from "../hooks/useDebounce";
 import { Button } from "@repo/ui/components/ui/button";
 import {
   Card,
@@ -25,6 +26,7 @@ import {
   Box,
   Fan,
   Info,
+  Loader2,
 } from "lucide-react";
 import ComponentDetailModal from "./components/component-detail-modal";
 
@@ -127,12 +129,58 @@ export default function BuilderPage() {
     number | null
   >(null);
 
-  const { components } = useListComponents();
-  const createBuildMutation = useCreateBuild();
-  const updateBuildMutation = useUpdateBuild();
-
+  // Get current step config first (needed for useListComponents)
   const currentStepConfig = BUILD_STEPS[currentStep]!;
   const StepIcon = currentStepConfig.icon;
+
+  // Debounce search query untuk menghindari terlalu banyak request
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
+  // Get dependency IDs for current step to include in query key
+  // This ensures the query resets when dependencies change
+  const getDependencyIds = () => {
+    const deps: Record<string, number | undefined> = {};
+    currentStepConfig.dependsOn.forEach((depKey) => {
+      deps[depKey] = buildState[`${depKey}Id` as keyof BuildState] as
+        | number
+        | undefined;
+    });
+    return deps;
+  };
+
+  const dependencyIds = getDependencyIds();
+
+  // Debug: Log ketika dependency IDs berubah
+  useEffect(() => {
+    if (dependencyIds.cpu || dependencyIds.motherboard) {
+      console.log(
+        `🔍 [${currentStepConfig.label}] Query dengan dependencies:`,
+        {
+          cpuId: dependencyIds.cpu,
+          motherboardId: dependencyIds.motherboard,
+          type: currentStepConfig.type,
+        },
+      );
+    }
+  }, [
+    dependencyIds.cpu,
+    dependencyIds.motherboard,
+    currentStepConfig.label,
+    currentStepConfig.type,
+  ]);
+
+  const { components, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useListComponents({
+      type: currentStepConfig.type,
+      search: debouncedSearch || undefined,
+      limit: 20,
+      // Include dependency IDs in query params
+      // This makes React Query treat it as a new query when deps change
+      cpuId: dependencyIds.cpu,
+      motherboardId: dependencyIds.motherboard,
+    });
+  const createBuildMutation = useCreateBuild();
+  const updateBuildMutation = useUpdateBuild();
 
   // Check if step is locked (dependencies not met)
   const isStepLocked = (stepIndex: number): boolean => {
@@ -220,18 +268,10 @@ export default function BuilderPage() {
     }
   };
 
-  // Filter components by current step type and compatibility
-  const currentComponents = components.filter((c) => {
-    if (c.type !== currentStepConfig.type) return false;
-    return isComponentCompatible(c, currentStepConfig.key);
-  });
-
-  // Filter by search query
-  const filteredComponents = searchQuery
-    ? currentComponents.filter((c) =>
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()),
-      )
-    : currentComponents;
+  // Filter components by compatibility (type and search already filtered by backend)
+  const filteredComponents = components.filter((c) =>
+    isComponentCompatible(c, currentStepConfig.key),
+  );
 
   // Get selected component ID for current step
   const selectedComponentId = buildState[
@@ -257,19 +297,64 @@ export default function BuilderPage() {
   const progress = (completedSteps / BUILD_STEPS.length) * 100;
 
   const handleSelectComponent = async (componentId: number) => {
+    // Clear dependent components when changing a parent component
+    const clearDependentComponents = () => {
+      const clearedState = { ...buildState };
+      const clearedSteps: string[] = [];
+
+      // Find all steps that depend on the current step
+      BUILD_STEPS.forEach((step) => {
+        if (
+          (step.dependsOn as readonly string[]).includes(currentStepConfig.key)
+        ) {
+          // Check if this component was selected before clearing
+          const stepKey = `${step.key}Id` as keyof BuildState;
+          if (buildState[stepKey]) {
+            clearedSteps.push(step.label);
+          }
+          // Clear this dependent component
+          delete clearedState[stepKey];
+
+          // Also clear components that depend on this one (recursive)
+          BUILD_STEPS.forEach((nestedStep) => {
+            if (
+              (nestedStep.dependsOn as readonly string[]).includes(step.key)
+            ) {
+              const nestedKey = `${nestedStep.key}Id` as keyof BuildState;
+              if (buildState[nestedKey]) {
+                clearedSteps.push(nestedStep.label);
+              }
+              delete clearedState[nestedKey];
+            }
+          });
+        }
+      });
+
+      return { clearedState, clearedSteps };
+    };
+
+    // Start with cleared dependent components
+    const { clearedState: baseState, clearedSteps } =
+      clearDependentComponents();
+
     const updatedBuild = {
-      ...buildState,
+      ...baseState,
       [`${currentStepConfig.key}Id`]: componentId,
     };
     setBuildState(updatedBuild);
+
+    // Show notification if components were cleared
+    if (clearedSteps.length > 0) {
+      console.log(
+        `🔄 Cleared incompatible components: ${clearedSteps.join(", ")}`,
+      );
+    }
 
     // Auto-save build
     if (buildId) {
       await updateBuildMutation.mutateAsync({
         id: buildId,
-        data: {
-          [`${currentStepConfig.key}Id`]: componentId,
-        },
+        data: updatedBuild,
       });
     } else {
       const newBuild = await createBuildMutation.mutateAsync({
@@ -382,6 +467,29 @@ export default function BuilderPage() {
       minimumFractionDigits: 0,
     }).format(price);
   };
+
+  // Infinite Scroll Setup
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasNextPage || isFetchingNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          fetchNextPage();
+        }
+      },
+      {
+        threshold: 0.1,
+        root: document.querySelector("#components-scroll-container"),
+      },
+    );
+
+    observer.observe(loadMoreRef.current);
+
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
@@ -554,7 +662,10 @@ export default function BuilderPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                <div
+                  className="space-y-3 max-h-[600px] overflow-y-auto pr-2"
+                  id="components-scroll-container"
+                >
                   {filteredComponents.length === 0 ? (
                     <div className="text-center py-12 text-slate-500 dark:text-slate-400">
                       <p className="text-lg">No compatible components found</p>
@@ -627,7 +738,7 @@ export default function BuilderPage() {
 
                       return (
                         <div
-                          key={component.id}
+                          key={`${currentStepConfig.type}-${component.id}`}
                           className={`
                             p-4 rounded-lg border-2 cursor-pointer transition-all relative group
                             ${
@@ -700,6 +811,20 @@ export default function BuilderPage() {
                         </div>
                       );
                     })
+                  )}
+
+                  {/* Infinite Scroll Trigger */}
+                  {hasNextPage && filteredComponents.length > 0 && (
+                    <div ref={loadMoreRef} className="flex justify-center py-4">
+                      {isFetchingNextPage && (
+                        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                          <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                          <span className="text-sm">
+                            Loading more components...
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </CardContent>

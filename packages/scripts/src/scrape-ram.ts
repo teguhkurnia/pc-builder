@@ -65,6 +65,7 @@ const scrapeRamDetail = async (ramUrl: string) => {
     name: $("h1[itemprop='name']").first().text().trim(),
     type: "RAM",
     imageUrl: null,
+    manufacturer: getSpec("Producer") || null,
     price: price,
     specifications: {
       type: getSpec("Type") || getSpec("Memory Type"),

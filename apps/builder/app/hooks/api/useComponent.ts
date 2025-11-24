@@ -1,19 +1,38 @@
+import { ListComponentsRequestSchema } from "@repo/api/models";
 import { api } from "../../utils/api";
 
-export const useListComponents = () => {
-  // Kita membungkus query tRPC di sini
-  const query = api.components.list.useQuery(undefined, {
-    // Anda bisa menaruh default config di sini agar UI component bersih
-    staleTime: 1000 * 60 * 5, // Cache 5 menit
-    refetchOnWindowFocus: false,
-  });
+export const useListComponents = (params?: ListComponentsRequestSchema) => {
+  // Gunakan useInfiniteQuery untuk infinite scroll
+  const query = api.components.list.useInfiniteQuery(
+    {
+      search: params?.search,
+      type: params?.type,
+      sortBy: params?.sortBy,
+      sortOrder: params?.sortOrder,
+      limit: params?.limit ?? 20,
+      // Include dependency IDs in query key untuk auto-reset ketika dependencies berubah
+      cpuId: params?.cpuId,
+      motherboardId: params?.motherboardId,
+    },
+    {
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+      staleTime: 1000 * 60 * 5, // Cache 5 menit
+      refetchOnWindowFocus: false,
+    },
+  );
 
-  // Kita bisa memodifikasi return value-nya agar lebih enak dipakai UI
+  // Flatten semua pages jadi satu array
+  const components = query.data?.pages.flatMap((page) => page.items) ?? [];
+
   return {
-    components: query.data ?? [], // Default empty array biar gak perlu cek null di UI
+    components,
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,
     refetch: query.refetch,
+    isFetching: query.isFetching,
+    fetchNextPage: query.fetchNextPage,
+    hasNextPage: query.hasNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
   };
 };
